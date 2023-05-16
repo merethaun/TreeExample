@@ -3,7 +3,7 @@
 
 Author: Meret Unbehaun, Advisor: Phillip Schroer
 
-This repository is supposed to demonstrate the ideas from the paper [TODO](Add original paper) on the example of binary Boolean trees.
+This repository is supposed to demonstrate the ideas from the paper [TODO](Add original paper) on the example of binary Integer trees.
 
 ## Implementations
 First of all, the concept of a Free Generator (the correct data type implementation) is programmed according to [TODO].
