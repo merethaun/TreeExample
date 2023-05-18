@@ -3,6 +3,10 @@ module FreeGen where
 import Test.QuickCheck (Gen)
 import qualified Test.QuickCheck.Gen as Gen
 
+import Text.Parsec.String (Parser)
+import Text.Parsec
+import Data.List (find)
+
 -- Basic definition of the type FreeGen (and other necessary definitions)
 data FreeGen a where
   Return :: a -> FreeGen a
@@ -30,11 +34,23 @@ type Choice = Char
 interpretAsG :: FreeGen a -> Gen a
 interpretAsG (Return v) = return v
 interpretAsG (Bind (Pick xs) f) = do
-  x <- Gen.frequency (map (\(Weight w,_,x) -> ((fromIntegral w), return x)) xs)
+  x <- Gen.frequency (map (\(Weight w, _, x) -> ((fromIntegral w), return x)) xs)
   a <- interpretAsG x
   interpretAsG (f a)
--- The next statemant (Bind without Pick) will most likely not be used, but needs to be defined to check all definitions of Bind
 interpretAsG (Bind m f) = do
   a <- interpretAsG m
-  interpretAsG (f a)
+  interpretAsG (f a) 
 
+--- Parser interpretation
+interpretAsP :: FreeGen a -> Parser a
+interpretAsP (Return v) = return v
+interpretAsP (Bind (Pick xs) f) = do
+  c <- oneOf (map (\(_, c, _) -> c) xs)
+  x <- case find (\(_, c', _) -> c==c') xs of
+    Just (_, _, x) -> return x
+    Nothing -> fail ""
+  a <- interpretAsP x
+  interpretAsP (f a)
+interpretAsP (Bind m f) = do
+  a <- interpretAsP m
+  interpretAsP (f a)
