@@ -64,4 +64,4 @@ interpretAsR (Bind (Pick xs) f) = do
   return (c : s)
 interpretAsR (Bind m f) = do
   s <- interpretAsR m
-  interpretAsP (f s)
+  interpretAsR (f s)
