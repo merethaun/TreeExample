@@ -54,3 +54,14 @@ interpretAsP (Bind (Pick xs) f) = do
 interpretAsP (Bind m f) = do
   a <- interpretAsP m
   interpretAsP (f a)
+
+--- Randomness interpretation
+interpretAsR :: FreeGen a -> Gen String
+interpretAsR (Return _) = return "" -- the empty word
+interpretAsR (Bind (Pick xs) f) = do
+  (c, x) <- Gen.frequency (map (\(Weight w, c, x) -> ((fromIntegral w), return (c, x))) xs)
+  s <- interpretAsR (Bind x f)
+  return (c : s)
+interpretAsR (Bind m f) = do
+  s <- interpretAsR m
+  interpretAsP (f s)
