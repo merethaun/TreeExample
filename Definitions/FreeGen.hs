@@ -7,12 +7,13 @@ import Text.Parsec.String (Parser)
 import Text.Parsec
 import Data.List (find)
 
+import Control.Monad (ap)
+
 -- Basic definition of the type FreeGen (and other necessary definitions)
 data FreeGen a where
   Return :: a -> FreeGen a
   Bind :: FreeGen a -> (a -> FreeGen b) -> FreeGen b
   Pick :: [(Weight, Choice, FreeGen a)] -> FreeGen a
-
 
 newtype Weight = Weight {toInt :: Integer} deriving (Eq, Ord)
 
@@ -28,6 +29,40 @@ instance Show Weight where show = show . toInt
 
 type Choice = Char
 
+--- making it monadic
+instance Functor FreeGen where
+  fmap f (Return a) = Return (f a)
+  fmap f (Bind m g) = Bind m (fmap f . g)
+  fmap f (Pick xs) = Pick [(w, c, fmap f x) | (w,c,x) <- xs]
+
+instance Applicative FreeGen where
+  pure = Return
+  (<*>) = ap
+
+instance Monad FreeGen where
+  return :: a -> FreeGen a
+  return = Return
+
+  (>>=) :: FreeGen a -> (a -> FreeGen b) -> FreeGen b
+  Return a >>= f = f a
+  Bind p g >>= f = Bind p (\a -> g a >>= f)
+
+isVoid :: FreeGen a -> Bool
+isVoid (Bind (Pick []) _) = True
+isVoid _ = False
+
+pick :: [(Weight, Choice, FreeGen a)] -> FreeGen a
+pick xs = 
+  case filter (\(_,_,x) -> not (isVoid x)) xs of
+    ys | hasDuplicates (map (\(_,y,_) -> y) ys) -> undefined
+    [] -> undefined
+    ys -> Bind (Pick ys) Return
+
+hasDuplicates :: Eq a => [a] -> Bool
+hasDuplicates [] = False
+hasDuplicates (x:xs) = x `elem` xs || hasDuplicates xs
+
+
 -- Interpretations of FreeGen
 
 --- Random generator interpretation
@@ -37,9 +72,6 @@ interpretAsG (Bind (Pick xs) f) = do
   x <- Gen.frequency (map (\(Weight w, _, x) -> ((fromIntegral w), return x)) xs)
   a <- interpretAsG x
   interpretAsG (f a)
-interpretAsG (Bind m f) = do
-  a <- interpretAsG m
-  interpretAsG (f a) 
 
 --- Parser interpretation
 interpretAsP :: FreeGen a -> Parser a
@@ -51,17 +83,11 @@ interpretAsP (Bind (Pick xs) f) = do
     Nothing -> fail ""
   a <- interpretAsP x
   interpretAsP (f a)
-interpretAsP (Bind m f) = do
-  a <- interpretAsP m
-  interpretAsP (f a)
 
 --- Randomness interpretation
 interpretAsR :: FreeGen a -> Gen String
 interpretAsR (Return _) = return "" -- the empty word
 interpretAsR (Bind (Pick xs) f) = do
   (c, x) <- Gen.frequency (map (\(Weight w, c, x) -> ((fromIntegral w), return (c, x))) xs)
-  s <- interpretAsR (Bind x f)
+  s <- interpretAsR (x >>= f)
   return (c : s)
-interpretAsR (Bind m f) = do
-  s <- interpretAsR m
-  interpretAsR (f s)
