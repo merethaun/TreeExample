@@ -80,7 +80,7 @@ interpretAsP (Bind (Pick xs) f) = do
   c <- oneOf (map (\(_, c, _) -> c) xs)
   x <- case find (\(_, c', _) -> c==c') xs of
     Just (_, _, x) -> return x
-    Nothing -> fail ""
+    Nothing -> fail "" -- will never occur since oneOf checks that c is a valid option
   a <- interpretAsP x
   interpretAsP (f a)
 
