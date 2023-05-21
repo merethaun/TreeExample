@@ -47,16 +47,11 @@ instance Monad FreeGen where
   Return a >>= f = f a
   Bind p g >>= f = Bind p (\a -> g a >>= f)
 
-isVoid :: FreeGen a -> Bool
-isVoid (Bind (Pick []) _) = True
-isVoid _ = False
-
 pick :: [(Weight, Choice, FreeGen a)] -> FreeGen a
-pick xs = 
-  case filter (\(_,_,x) -> not (isVoid x)) xs of
-    ys | hasDuplicates (map (\(_,y,_) -> y) ys) -> undefined
-    [] -> undefined
-    ys -> Bind (Pick ys) Return
+pick xs
+  | null xs = undefined
+  | hasDuplicates (map (\(_,c,_) -> c) xs) = undefined
+  | otherwise = Bind (Pick xs) Return
 
 hasDuplicates :: Eq a => [a] -> Bool
 hasDuplicates [] = False
@@ -78,11 +73,18 @@ interpretAsP :: FreeGen a -> Parser a
 interpretAsP (Return v) = return v
 interpretAsP (Bind (Pick xs) f) = do
   c <- oneOf (map (\(_, c, _) -> c) xs)
-  x <- case find (\(_, c', _) -> c==c') xs of
-    Just (_, _, x) -> return x
-    Nothing -> fail "" -- will never occur since oneOf checks that c is a valid option
+  x <- return (getFreeGenForChoice xs c)
+  --x <- case find (\(_, c', _) -> c==c') xs of
+  --  Just (_, _, x) -> return x
+  --  Nothing -> fail "" -- will never occur since oneOf checks that c is a valid option
   a <- interpretAsP x
   interpretAsP (f a)
+
+getFreeGenForChoice :: [(Weight, Choice, FreeGen a)] -> Choice -> FreeGen a
+getFreeGenForChoice [] _ = error ""
+getFreeGenForChoice ((_, c, comp):xs) c'
+  | c==c' = comp
+  | otherwise = getFreeGenForChoice xs c'
 
 --- Randomness interpretation
 interpretAsR :: FreeGen a -> Gen String
